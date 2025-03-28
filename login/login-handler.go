@@ -15,8 +15,8 @@ import (
 func Home(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	response := map[string]string{"message": "Welcome Home..!"}
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusOK, Message: "Welcome Home..!",
+		Details: "You Are Entered Into A Server"})
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -24,30 +24,30 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	var u models.User
 	err := json.NewDecoder(r.Body).Decode(&u)
-	//fmt.Printf("The user request value %v", u)
 	if err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "invalid request payload", Details: err.Error()})
 		return
 	}
 
-	user, err := userhandlers.GetUserByUsername(u.Username)
+	user, err := userhandlers.GetUserByUsername(u.Username, u.Password)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "invalid username or password", http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "invalid username or password"})
+			return
 		} else {
-			http.Error(w, "server error", http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error", Details: err.Error()})
+			return
 		}
-		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(u.Password)); err != nil {
-		http.Error(w, "invalid username or password", http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "invalid username or password", Details: err.Error()})
 		return
 	}
 
 	token, err := helpers.CreateToken(user.ID, user.Username)
 	if err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error", Details: err.Error()})
 		return
 	}
 
@@ -60,19 +60,33 @@ func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	tokenString := r.Header.Get("Authorization")
 	if tokenString == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, "Missing authorization header")
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "Missing authorization header", Details: tokenString})
+		// w.WriteHeader(http.StatusUnauthorized)
+		// fmt.Fprint(w, "Missing authorization header")
 		return
 	}
 	tokenString = tokenString[len("Bearer "):]
 
 	err := helpers.VerifyToken(tokenString)
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprint(w, "Invalid token")
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "Invalid token", Details: err.Error()})
+		// w.WriteHeader(http.StatusUnauthorized)
+		// fmt.Fprint(w, "Invalid token")
 		return
 	}
+	json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusOK, Message: "Welcome to the the protected area"})
+}
 
-	fmt.Fprint(w, "Welcome to the the protected area")
+func HashPassword(password string) (string, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("error hashing password: %s", err.Error())
+	}
+	return string(hashedPassword), nil
+}
 
+// CheckPassword compares a hashed password with a plain password
+func CheckPassword(hashedPassword, plainPassword string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(plainPassword))
+	return err == nil // Returns true if the password matches
 }

@@ -1,9 +1,6 @@
 package models
 
-// type User struct {
-// 	UserName string
-// 	Password string
-// }
+import "fmt"
 
 type User struct {
 	ID       int64  `gorm:"primaryKey" json:"user_id"`
@@ -17,3 +14,13 @@ type User struct {
 // 	Body     string `json:”body”`
 // 	AuthorID string `json:”author_id”`
 // }
+
+type APIResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Details string `json:"details"`
+}
+
+func (e *APIResponse) Error() string {
+	return fmt.Sprintf("Error%d:%s", e.Code, e.Message)
+}

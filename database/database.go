@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -12,7 +13,8 @@ import (
 // Global database variable
 var db *gorm.DB
 
-func DBConnection() {
+func DBConnection() (error, db *gorm.DB) {
+	godotenv.Load()
 	// Load from environment variables
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
@@ -21,21 +23,22 @@ func DBConnection() {
 	)
 
 	// Connect to database
-	var err error
-	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	//var err error
+	db1, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect:", err)
 	}
 
 	fmt.Println("Connected using environment variables!")
 
-	errr := db.Exec(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY,username TEXT,password TEXT);`)
+	errr := db1.Exec(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY,username TEXT,password TEXT);`)
 	if err != nil {
 		fmt.Printf("error in creating unexciting users table in database: %v", errr.Error)
 	}
 
 	// Ensure database connection is closed when main function exits
-	defer DBC()
+	//defer DBC()
+	return db1, nil
 }
 
 func DBC() {
