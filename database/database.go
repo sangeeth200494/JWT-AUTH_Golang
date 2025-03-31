@@ -10,10 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Global database variable
-var db *gorm.DB
-
-func DBConnection() (error, db *gorm.DB) {
+func DBConnection() (db *gorm.DB, err error) {
 	godotenv.Load()
 	// Load from environment variables
 	dsn := fmt.Sprintf(
@@ -23,32 +20,28 @@ func DBConnection() (error, db *gorm.DB) {
 	)
 
 	// Connect to database
-	//var err error
-	db1, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Fatal("Failed to connect:", err)
+	db, errr := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if errr != nil {
+		log.Fatal("Failed to connect:", errr.Error())
 	}
 
 	fmt.Println("Connected using environment variables!")
 
-	errr := db1.Exec(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY,username TEXT,password TEXT);`)
-	if err != nil {
-		fmt.Printf("error in creating unexciting users table in database: %v", errr.Error)
+	res := db.Exec(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY,username TEXT,password TEXT);`)
+	if res.Error != nil {
+		fmt.Printf("error in creating unexciting users table in database: %v", res.Error)
 	}
-
-	// Ensure database connection is closed when main function exits
-	//defer DBC()
-	return db1, nil
+	return db, nil
 }
 
-func DBC() {
-	sqlDB, err := db.DB()
+func DBC(db *gorm.DB) {
+	sqlDB, err := db.DB() // Get the raw SQL DB connection
 	if err != nil {
-		log.Println("Error getting database instance:", err)
+		log.Println("Error getting SQL database:", err)
 		return
 	}
 
-	err = sqlDB.Close()
+	err = sqlDB.Close() // Close the connection
 	if err != nil {
 		log.Println("Error closing database connection:", err)
 		return
