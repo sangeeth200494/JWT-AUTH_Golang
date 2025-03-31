@@ -1,2 +1,7 @@
 .env
+<<<<<<< HEAD
 .vscode
+=======
+.vscode
+.env.local
+>>>>>>> 6c7244245314b826f7e4d5d4b5da7e752c0a7b0c
