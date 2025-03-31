@@ -2,56 +2,76 @@ package helpers
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var secretKey = []byte("secret-key")
 
-func CreateToken(userID int64, username string) (string, error) {
-	fmt.Println(1111111111111111)
+func CreateToken(userID uint64, username string) (string, error) {
+	// adding claims into generating token
 	claims := jwt.MapClaims{}
 	claims["user_id"] = userID
 	claims["username"] = username
 	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	fmt.Println(22222222222222222)
 
+	// creates and returns a complete, signed JWT
 	tokenString, err := token.SignedString(secretKey)
 	if err != nil {
-		fmt.Println(333333333333)
 		return "", err
 	}
-	fmt.Println(4444444444444444)
-	return tokenString, nil
+	return tokenString, nil // returning the token string and nill error
 }
 
 func VerifyToken(tokenString string) error {
-	fmt.Println("AAAAAAAAAAAAA")
+	// Parse parses, validates, verifies the signature and returns the parsed token
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		fmt.Println("BBBBBBBBBBBBBBB")
 		return secretKey, nil
 	})
 
+	// checking any error caused
 	if err != nil {
-		fmt.Println("CCCCCCCCCCCCCC")
 		return err
 	}
 
+	// validating the token
 	if !token.Valid {
-		fmt.Println("DDDDDDDDDDDDD")
 		return fmt.Errorf("invalid token")
 	}
-	fmt.Println("EEEEEEEEE")
-	return nil
+	return nil // returning nil error
 }
 
-func HashPassword(password string) (string, error) {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+func ExtractUsernameFromToken(tokenString string) (string, error) {
+	// Remove "Bearer
+	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+
+	// Parse the token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Ensure the signing method is HMAC
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return secretKey, nil
+	})
+
+	// If parsing fails, return an error
 	if err != nil {
-		return "", fmt.Errorf("error hashing password: %s", err.Error())
+		return "", fmt.Errorf("error parsing token: %v", err)
 	}
-	return string(hashedPassword), nil
+
+	// Extract claims and validate
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return "", fmt.Errorf("invalid token")
+	}
+
+	// Extract username
+	username, exists := claims["username"].(string)
+	if !exists {
+		return "", fmt.Errorf("username claim not found") // returning the empty string and caused error
+	}
+	return username, nil // returning the username and nil error
 }
