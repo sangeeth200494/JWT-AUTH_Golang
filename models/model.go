@@ -61,3 +61,5 @@ func CheckPasswordExistence(username, newPassword string, db *gorm.DB) (bool, er
 	}
 	return true, nil //returning the password existence
 }
+
+//kekr kr c r"
