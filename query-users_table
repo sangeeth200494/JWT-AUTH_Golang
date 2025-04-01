@@ -1,0 +1,25 @@
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,                     -- Auto-incrementing ID
+    username VARCHAR(255) UNIQUE NOT NULL,     -- Unique username
+    email VARCHAR(255) UNIQUE NOT NULL,        -- Unique email
+    password_hash TEXT NOT NULL,               -- Hashed password
+    full_name VARCHAR(255),                    -- Full name (optional)
+    phone_number VARCHAR(15),                  -- Phone number (optional)
+    profile_picture_url TEXT,                  -- URL to profile picture (optional)
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,  -- Created timestamp
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,  -- Updated timestamp
+    last_login TIMESTAMPTZ,                    -- Last login timestamp
+    status VARCHAR(50) DEFAULT 'active',       -- User status (active, suspended, etc.)
+    role VARCHAR(50) DEFAULT 'user',           -- User role (admin, user, etc.)
+    two_factor_enabled BOOLEAN DEFAULT FALSE,  -- Whether 2FA is enabled
+    failed_login_attempts INT DEFAULT 0,       -- Failed login attempts counter
+    lock_status BOOLEAN DEFAULT FALSE,         -- Account lock status
+    deleted_at TIMESTAMPTZ,                    -- Soft delete timestamp (nullable)
+    CONSTRAINT email_check CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$') -- Email validation pattern
+);
+
+-- Add an index on the email for faster lookups
+CREATE INDEX idx_email ON users(email);
+
+-- Add an index on the username for faster lookups
+CREATE INDEX idx_username ON users(username);
