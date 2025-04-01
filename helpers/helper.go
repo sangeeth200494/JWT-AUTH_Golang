@@ -2,13 +2,21 @@ package helpers
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/joho/godotenv"
 )
 
-var secretKey = []byte("secret-key")
+// Load environment variables from .env file
+func init() {
+	godotenv.Load()
+}
+
+// var secretKey = []byte("secret-key")
+var secretKey = []byte(os.Getenv("JWT_SECRET"))
 
 func CreateToken(userID uint64, username string) (string, error) {
 	// adding claims into generating token
@@ -16,7 +24,7 @@ func CreateToken(userID uint64, username string) (string, error) {
 	claims["user_id"] = userID
 	claims["username"] = username
 	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 
 	// creates and returns a complete, signed JWT
 	tokenString, err := token.SignedString(secretKey)
@@ -27,21 +35,34 @@ func CreateToken(userID uint64, username string) (string, error) {
 }
 
 func VerifyToken(tokenString string) error {
-	// Parse parses, validates, verifies the signature and returns the parsed token
+	// Parse the token, validate the signature and retrieve the token claims
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Ensure that the token's signing method is correct (HS512)
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
 		return secretKey, nil
 	})
 
-	// checking any error caused
+	// Handle error while parsing token (invalid format, signature verification failed, etc.)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse token: %v", err)
 	}
 
-	// validating the token
+	// Validate the token's validity
 	if !token.Valid {
 		return fmt.Errorf("invalid token")
 	}
-	return nil // returning nil error
+
+	// Additional check for token expiration (optional, depending on your needs)
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if exp, ok := claims["exp"].(float64); ok {
+			if exp < float64(time.Now().Unix()) {
+				return fmt.Errorf("token has expired")
+			}
+		}
+	}
+	return nil // Return nil if the token is valid
 }
 
 func ExtractUsernameFromToken(tokenString string) (string, error) {
@@ -66,6 +87,13 @@ func ExtractUsernameFromToken(tokenString string) (string, error) {
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
 		return "", fmt.Errorf("invalid token")
+	}
+
+	// Optionally check if the token has expired
+	if exp, ok := claims["exp"].(float64); ok {
+		if int64(exp) < time.Now().Unix() {
+			return "", fmt.Errorf("token has expired")
+		}
 	}
 
 	// Extract username

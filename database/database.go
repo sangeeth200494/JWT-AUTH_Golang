@@ -35,17 +35,19 @@ func DBConnection() (db *gorm.DB, err error) {
 }
 
 func DBC(db *gorm.DB) {
-	sqlDB, err := db.DB() // Get the raw SQL DB connection
+	// Get the raw SQL DB connection
+	sqlDB, err := db.DB()
 	if err != nil {
 		log.Println("Error getting SQL database:", err)
 		return
 	}
 
-	err = sqlDB.Close() // Close the connection
+	// Close the connection
+	err = sqlDB.Close()
 	if err != nil {
 		log.Println("Error closing database connection:", err)
 		return
 	}
-
+	// response after closing
 	fmt.Println("Database connection closed successfully!")
 }

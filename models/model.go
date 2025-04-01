@@ -3,16 +3,36 @@ package models
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 type User struct {
-	ID       uint64 `gorm:"primaryKey" json:"user_id"`
-	Username string `gorm:"size:100;not null" json:"username"`
-	Password string `gorm:"unique;not null" json:"password"`
+	ID                  uint64     `json:"id" gorm:"primaryKey"`
+	Username            string     `json:"username" gorm:"unique;not null"`
+	Email               string     `json:"email" gorm:"unique;not null"`
+	Password            string     `json:"Password" gorm:"not null"`
+	FullName            string     `json:"full_name"`
+	PhoneNumber         string     `json:"phone_number"`
+	ProfilePictureURL   string     `json:"profile_picture_url"`
+	CreatedAt           time.Time  `json:"created_at" gorm:"default:CURRENT_TIMESTAMP"`
+	UpdatedAt           time.Time  `json:"updated_at" gorm:"default:CURRENT_TIMESTAMP"`
+	LastLogin           time.Time  `json:"last_login"`
+	Status              string     `json:"status" gorm:"default:'active'"`
+	Role                string     `json:"role" gorm:"default:'user'"`
+	TwoFactorEnabled    bool       `json:"two_factor_enabled" gorm:"default:false"`
+	FailedLoginAttempts int        `json:"failed_login_attempts" gorm:"default:0"`
+	LockStatus          bool       `json:"lock_status" gorm:"default:false"`
+	DeletedAt           *time.Time `json:"deleted_at"`
 }
+
+// type UserLogin struct {
+// 	ID       uint64 `gorm:"primaryKey" json:"user_id"`
+// 	Username string `gorm:"size:100;not null" json:"username"`
+// 	Password string `gorm:"unique;not null" json:"password"`
+// }
 
 type APIResponse struct {
 	Code    int         `json:"code"`
