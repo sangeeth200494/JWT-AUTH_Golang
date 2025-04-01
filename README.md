@@ -11,6 +11,7 @@ A secure JWT-based authentication system built in Golang using Gorilla Mux and G
 # 📌 Installation & Setup
 1️⃣ Clone the Repository
 git clone https://github.com/sangeeth200494/JWT-AUTH_Golang.git
+
 cd JWT-AUTH_Golang
 
 
@@ -25,7 +26,7 @@ DB_USER=your_username
 DB_PASSWORD=your_password
 DB_NAME=jwt_auth_db
 DB_PORT=5432
-SECRET_KEY=your_secret_key
+
 
 
 4️⃣ Run the Application
