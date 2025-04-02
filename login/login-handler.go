@@ -57,7 +57,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// generate token
-	token, err := helpers.CreateToken(user.ID, user.Username)
+	token, err := helpers.CreateToken(user.ID, user.Username, user.CreatedAt, user.UpdatedAt, user.LastLogin, user.Status, user.Role)
 	if err != nil {
 		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error", Details: err.Error()})
 		return
@@ -80,19 +80,15 @@ func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenString = tokenString[len("Bearer "):]
 
-	// extract token string and collecting required data
-	username, err := helpers.ExtractUsernameFromToken(tokenString)
-	if err != nil {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "Invalid token", Details: err.Error()})
-		return
-	}
+	username, _ := helpers.ExtractUsernameFromToken(tokenString)
 
 	// validating the token
 	errr := helpers.VerifyToken(tokenString)
 	if errr != nil {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "Invalid token", Details: errr.Error()})
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "Invalid token in verification", Details: errr.Error()})
 		return
 	}
+
 	// success response
 	json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusOK, Message: "Welcome to the the protected area", Details: username})
 }
