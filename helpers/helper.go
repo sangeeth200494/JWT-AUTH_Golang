@@ -18,16 +18,21 @@ func init() {
 // var secretKey = []byte("secret-key")
 var secretKey = []byte(os.Getenv("JWT_SECRET"))
 
-func CreateToken(userID uint64, username string) (string, error) {
+func CreateToken(userID uint64, username string, createdAt time.Time, updatedAt time.Time, lastLogin time.Time, status string, role string) (string, error) {
 	// adding claims into generating token
 	claims := jwt.MapClaims{}
 	claims["user_id"] = userID
 	claims["username"] = username
+	claims["created_at"] = createdAt
+	claims["updated_at"] = updatedAt
+	claims["last_login"] = lastLogin
+	claims["status"] = status
+	claims["role"] = role
 	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 
 	// creates and returns a complete, signed JWT
-	tokenString, err := token.SignedString(secretKey)
+	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
 		return "", err
 	}
@@ -35,13 +40,17 @@ func CreateToken(userID uint64, username string) (string, error) {
 }
 
 func VerifyToken(tokenString string) error {
+
+	// Remove "Bearer
+	TokenString := strings.TrimPrefix(tokenString, "Bearer ")
+
 	// Parse the token, validate the signature and retrieve the token claims
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(TokenString, func(token *jwt.Token) (interface{}, error) {
 		// Ensure that the token's signing method is correct (HS512)
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return secretKey, nil
+		return []byte(os.Getenv("JWT_SECRET")), nil
 	})
 
 	// Handle error while parsing token (invalid format, signature verification failed, etc.)
@@ -67,15 +76,15 @@ func VerifyToken(tokenString string) error {
 
 func ExtractUsernameFromToken(tokenString string) (string, error) {
 	// Remove "Bearer
-	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+	TokenString := strings.TrimPrefix(tokenString, "Bearer ")
 
 	// Parse the token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(TokenString, func(token *jwt.Token) (interface{}, error) {
 		// Ensure the signing method is HMAC
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return secretKey, nil
+		return []byte(os.Getenv("JWT_SECRET")), nil
 	})
 
 	// If parsing fails, return an error
