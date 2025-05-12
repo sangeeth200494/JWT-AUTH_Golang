@@ -74,7 +74,7 @@ func VerifyToken(tokenString string) error {
 	return nil // Return nil if the token is valid
 }
 
-func ExtractUsernameFromToken(tokenString string) (string, error) {
+func ExtractUsernameFromToken(tokenString string) (interface{}, error) {
 	// Remove "Bearer
 	TokenString := strings.TrimPrefix(tokenString, "Bearer ")
 

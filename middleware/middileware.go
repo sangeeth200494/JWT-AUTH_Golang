@@ -40,6 +40,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
+			// return []byte(secretKey), nil
 			return []byte(secretKey), nil
 		})
 
@@ -56,8 +57,8 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Extract values safely
-		userID, _ := claims["user_id"].(string)
-		userName, _ := claims["username"].(string)
+		userID, _ := claims["user_id"].(float64)
+		username, _ := claims["username"].(string)
 		createdAt, _ := claims["created_at"].(string)
 		updatedAt, _ := claims["updated_at"].(string)
 		lastLogin, _ := claims["last_login"].(string) // Fixed inconsistent naming
@@ -67,7 +68,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		// Chain context values properly
 		ctx := context.WithValue(r.Context(), contextKey("user_id"), userID)
-		ctx = context.WithValue(ctx, contextKey("username"), userName)
+		ctx = context.WithValue(ctx, contextKey("username"), username)
 		ctx = context.WithValue(ctx, contextKey("created_at"), createdAt)
 		ctx = context.WithValue(ctx, contextKey("updated_at"), updatedAt)
 		ctx = context.WithValue(ctx, contextKey("last_login"), lastLogin)

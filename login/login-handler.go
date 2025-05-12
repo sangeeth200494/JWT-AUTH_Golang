@@ -31,14 +31,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var u models.User
 	err := json.NewDecoder(r.Body).Decode(&u)
 	if err != nil {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "invalid request payload", Details: err.Error()})
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusBadRequest, Message: "invalid request payload", Details: err.Error()})
 		return
 	}
 
 	// parsing db connection into a variable
 	db, err := database.DBConnection()
 	if err != nil {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "database connection failed", Details: err.Error()})
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusBadRequest, Message: "database connection failed", Details: err.Error()})
 		return
 	}
 	defer database.DBC(db)
@@ -48,10 +48,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// comparing the error with gorm error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "invalid username or password"})
+			json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusUnauthorized, Message: "invalid username or password"})
 			return
 		} else {
-			json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error", Details: err.Error()})
+			json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusInternalServerError, Message: "server error", Details: err.Error()})
 			return
 		}
 	}
@@ -59,7 +59,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// generate token
 	token, err := helpers.CreateToken(user.ID, user.Username, user.CreatedAt, user.UpdatedAt, user.LastLogin, user.Status, user.Role)
 	if err != nil {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error", Details: err.Error()})
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusBadRequest, Message: "server error", Details: err.Error()})
 		return
 	}
 	// returns a new encoder that writes to w.
@@ -71,26 +71,37 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
 	// It informs the client (browser, Postman, frontend app, etc.) that the response body will be in JSON format.
 	w.Header().Set("Content-Type", "application/json")
+	type contextKey string
 
 	// getting token from header
 	tokenString := r.Header.Get("Authorization")
 	if tokenString == "" {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "Missing authorization header", Details: tokenString})
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusUnauthorized, Message: "Missing authorization header", Details: tokenString})
 		return
 	}
 	tokenString = tokenString[len("Bearer "):]
 
-	username, _ := helpers.ExtractUsernameFromToken(tokenString)
-
 	// validating the token
 	errr := helpers.VerifyToken(tokenString)
 	if errr != nil {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "Invalid token in verification", Details: errr.Error()})
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusUnauthorized, Message: "Invalid token in verification", Details: errr.Error()})
 		return
 	}
 
+	// extract username from header
+	// userName, err := helpers.ExtractUsernameFromToken(tokenString)
+
+	username := r.Context().Value(contextKey("username"))
+	userNAME, ok := username.(string)
+	if !ok || userNAME == "" {
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusUnauthorized, Message: "username not found in context", Details: userNAME})
+		fmt.Println("UserName is: ", userNAME)
+		return
+	}
+	//fmt.Println("UserName is: ", userNAME)
+
 	// success response
-	json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusOK, Message: "Welcome to the the protected area", Details: username})
+	json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusOK, Message: "Welcome to the the protected area", Details: userNAME})
 }
 
 func VerifyUser(UserName string, db *gorm.DB) (*models.User, error) {
