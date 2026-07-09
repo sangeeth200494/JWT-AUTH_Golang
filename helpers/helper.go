@@ -16,7 +16,7 @@ func init() {
 }
 
 // var secretKey = []byte("secret-key")
-var secretKey = []byte(os.Getenv("JWT_SECRET"))
+// var secretKey = []byte(os.Getenv("JWT_SECRET"))
 
 func CreateToken(userID uint64, username string, createdAt time.Time, updatedAt time.Time, lastLogin time.Time, status string, role string) (string, error) {
 	// adding claims into generating token

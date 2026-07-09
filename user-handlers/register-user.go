@@ -50,38 +50,45 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusCreated, Message: "user registered successfully", Details: user.ID})
 }
 
-func GetUserByUsername(username string, password string, db *gorm.DB) (*models.User, error) {
+func GetUserByUserEmail(email string, password string, db *gorm.DB) (*models.User, error) {
 	var user models.User
+	fmt.Println("aaaaaa")
 
 	// parsing stored hashed password of a user by given username
-	StoredHashed, err := GetStoredPassword(db, username)
+	StoredHashed, err := GetStoredPassword(db, email)
 	if err != nil {
 		return nil, fmt.Errorf("error getting stored hashed password from db: %s", err.Error())
 	}
+	fmt.Println("bbbbbb")
 
 	// validating the password with user input password
 	errr := models.ValidatePasswords(password, StoredHashed)
 	if errr != nil {
 		return nil, fmt.Errorf("error in registering user: %s", errr.Error())
 	}
+	fmt.Println("cccccc")
 
 	//var db *gorm.DB
-	row := db.Raw("SELECT id, username, password FROM users WHERE username = ?", username).Scan(&user)
+	row := db.Raw("SELECT id, username, email, password FROM users WHERE email = ?", email).Scan(&user)
 	if row.Error != nil {
 		return nil, fmt.Errorf("error in retrieving user details: %s", row.Error)
 	}
+	fmt.Println("ddddddd")
 
 	// checking the any error is caused
 	if row.Error != nil {
 		return nil, fmt.Errorf("user not found: %s", row.Error)
 	}
+	fmt.Println("eeeeeee")
 	return &user, nil // returning the user
 }
 
 func GetStoredPassword(db *gorm.DB, username string) (string, error) {
 	var user models.User
+	fmt.Println("username: ", username)
 	// retrieving user from database using given username
 	result := db.Where("username = ?", username).First(&user)
+	fmt.Println("result is :", result)
 	if result.Error != nil {
 		return "", result.Error // Return error if user not found
 	}
