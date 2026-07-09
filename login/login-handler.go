@@ -26,7 +26,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// It informs the client (browser, Postman, frontend app, etc.) that the response body will be in JSON format.
 	w.Header().Set("Content-Type", "application/json")
-
+	fmt.Println("111111")
 	// binding the request body
 	var u models.User
 	err := json.NewDecoder(r.Body).Decode(&u)
@@ -34,6 +34,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "invalid request payload", Details: err.Error()})
 		return
 	}
+	fmt.Println("22222")
+
+	fmt.Println("Username:", u.Username)
+	fmt.Println("Email:", u.Email)
+	fmt.Println("Password:", u.Password)
 
 	// parsing db connection into a variable
 	db, err := database.DBConnection()
@@ -41,20 +46,23 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "database connection failed", Details: err.Error()})
 		return
 	}
+	fmt.Println("333333")
 	defer database.DBC(db)
 
-	// calling function to check the existence of a user by username and password
-	user, err := userhandlers.GetUserByUsername(u.Username, u.Password, db)
+	// calling function to check the existence of a user by email and password
+	user, err := userhandlers.GetUserByUserEmail(u.Email, u.Password, db)
+	fmt.Println("user is : ", user)
 	if err != nil {
 		// comparing the error with gorm error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "invalid username or password"})
+			json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "invalid email or password"})
 			return
 		} else {
 			json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error", Details: err.Error()})
 			return
 		}
 	}
+	fmt.Println("4444444")
 
 	// generate token
 	token, err := helpers.CreateToken(user.ID, user.Username, user.CreatedAt, user.UpdatedAt, user.LastLogin, user.Status, user.Role)
@@ -62,6 +70,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error", Details: err.Error()})
 		return
 	}
+	fmt.Println("5555555")
 	// returns a new encoder that writes to w.
 	json.NewEncoder(w).Encode(map[string]string{
 		"token": token,
