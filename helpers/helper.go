@@ -8,6 +8,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
+	"github.com/sangeeth200494/JWT-AUTH_Golang/models"
+	"gorm.io/gorm"
 )
 
 // Load environment variables from .env file
@@ -111,4 +113,52 @@ func ExtractUsernameFromToken(tokenString string) (interface{}, error) {
 		return "", fmt.Errorf("username claim not found") // returning the empty string and caused error
 	}
 	return username, nil // returning the username and nil error
+}
+
+/////////////////////////////--------Get User helper function--------/////////////////////////////
+
+func GetUserByUserEmail(email string, password string, db *gorm.DB) (*models.User, error) {
+	var user models.User
+	fmt.Println("aaaaaa")
+
+	// parsing stored hashed password of a user by given username
+	StoredHashed, err := GetStoredPassword(db, email)
+	if err != nil {
+		return nil, fmt.Errorf("error getting stored hashed password from db: %s", err.Error())
+	}
+	fmt.Println("bbbbbb")
+
+	// validating the password with user input password
+	errr := models.ValidatePasswords(password, StoredHashed)
+	if errr != nil {
+		return nil, fmt.Errorf("error in validating user: %s", errr.Error())
+	}
+	fmt.Println("cccccc")
+
+	//var db *gorm.DB
+	// row := db.Raw("SELECT id, username, email, password FROM users WHERE email = ?", email).Scan(&user)
+	// if row.Error != nil {
+	// 	fmt.Println("error is error")
+	// 	return nil, fmt.Errorf("error in retrieving user details: %s", row.Error)
+	// }
+	// fmt.Println("ddddddd")
+
+	// // checking the any error is caused
+	// if row.Error != nil {
+	// 	return nil, fmt.Errorf("user not found: %s", row.Error)
+	// }
+	fmt.Println("eeeeeee")
+	return &user, nil // returning the user
+}
+
+func GetStoredPassword(db *gorm.DB, email string) (string, error) {
+	var user models.User
+	fmt.Println("email is: ", email)
+	// retrieving user from database using given email
+	result := db.Where("email = ?", email).First(&user)
+	fmt.Println("result is :", result)
+	if result.Error != nil {
+		return "", result.Error // Return error if user not found
+	}
+	return user.Password, nil // Return the stored hashed password
 }
