@@ -1,0 +1,12 @@
+.git
+.github
+.vscode
+.tmp
+.gopath
+.gocache
+bin/
+dist/
+*.exe
+*.out
+coverage.*
+*.log

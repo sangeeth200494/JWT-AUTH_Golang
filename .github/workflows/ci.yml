@@ -1,0 +1,123 @@
+name: CI - Quality Gates & Verification
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-quality-gate:
+    name: Quality Gate & Validation
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: jwt_auth_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: "1234"
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # Stage 1: Source code checkout
+      - name: 1. Source Code Checkout
+        uses: actions/checkout@v4
+
+      # Stage 2: Go Setup & Dependency Installation
+      - name: 2. Set up Go & Install Dependencies
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Verify Go Dependencies
+        run: |
+          echo "Verifying Go module dependencies..."
+          go mod download
+          go mod verify
+
+      # Stage 3: Code Formatting Check
+      - name: 3. Go Formatting & Code Quality Checks (gofmt)
+        run: |
+          echo "Checking gofmt formatting compliance..."
+          unformatted=$(gofmt -s -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::Unformatted Go files detected:"
+            echo "$unformatted"
+            echo "Run 'gofmt -s -w .' locally to fix formatting."
+            exit 1
+          fi
+          echo "All Go files comply with gofmt standards."
+
+      # Stage 4: Static Code Analysis and Linting
+      - name: 4. Static Code Analysis (go vet)
+        run: |
+          echo "Running static analysis via go vet..."
+          go vet ./...
+
+      # Stage 5 & 6: Backend Unit & Integration Testing
+      - name: 5 & 6. Backend Unit & Integration Testing
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: "1234"
+          DB_NAME: jwt_auth_db
+          JWT_SECRET: ci-test-secret-key-1234567890-jwt-secret-testing
+        run: |
+          echo "Running unit and integration tests with race detection and coverage..."
+          go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Upload Test Coverage Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: code-coverage-report
+          path: coverage.out
+          retention-days: 7
+
+      # Stage 7: Frontend Validation & Token Masking Security Test
+      - name: 7. Frontend Validation & Security Scanning
+        run: |
+          echo "Executing frontend security and regression tests..."
+          go test -v ./tests -run TestFrontend
+
+      # Stage 8: Security & Dependency Vulnerability Scanning
+      - name: 8. Security & Vulnerability Scanning (govulncheck)
+        run: |
+          echo "Installing and executing govulncheck..."
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+      # Stage 9: Docker Configuration Validation
+      - name: 9. Docker Configuration Validation
+        run: |
+          echo "Validating docker-compose.yml configuration..."
+          docker compose config --quiet
+          echo "docker-compose.yml is valid."
+
+      # Stage 10: Docker Image Build & Validation
+      - name: 10. Docker Image Build Validation
+        run: |
+          echo "Building production Docker container image..."
+          docker build \
+            --tag jwt-auth-server:${{ github.sha }} \
+            --tag jwt-auth-server:latest \
+            .
+          echo "Docker image built successfully with tag ${{ github.sha }}."

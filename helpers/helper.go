@@ -8,6 +8,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
+	"github.com/sangeeth200494/JWT-AUTH_Golang/models"
+	"gorm.io/gorm"
 )
 
 // Load environment variables from .env file
@@ -74,7 +76,7 @@ func VerifyToken(tokenString string) error {
 	return nil // Return nil if the token is valid
 }
 
-func ExtractUsernameFromToken(tokenString string) (string, error) {
+func ExtractUsernameFromToken(tokenString string) (interface{}, error) {
 	// Remove "Bearer
 	TokenString := strings.TrimPrefix(tokenString, "Bearer ")
 
@@ -111,4 +113,93 @@ func ExtractUsernameFromToken(tokenString string) (string, error) {
 		return "", fmt.Errorf("username claim not found") // returning the empty string and caused error
 	}
 	return username, nil // returning the username and nil error
+}
+
+// MaskToken returns a masked representation of the JWT token.
+// Expected Format: eyJhbGciOiJIUzUx...••••••••••••••••
+// Never exposes the complete token, sensitive payload, or signature.
+func MaskToken(tokenString string) string {
+	token := strings.TrimPrefix(tokenString, "Bearer ")
+	token = strings.TrimSpace(token)
+	if len(token) == 0 {
+		return "••••••••••••••••"
+	}
+	if len(token) <= 16 {
+		return "••••••••••••••••"
+	}
+	prefix := token[:16]
+	return prefix + "...••••••••••••••••"
+}
+
+// ExtractClaimsFromToken parses and extracts claims from a valid token.
+func ExtractClaimsFromToken(tokenString string) (jwt.MapClaims, error) {
+	tokenStr := strings.TrimPrefix(tokenString, "Bearer ")
+	tokenStr = strings.TrimSpace(tokenStr)
+
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token: %v", err)
+	}
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid claims")
+	}
+	return claims, nil
+}
+
+/////////////////////////////--------Get User helper function--------/////////////////////////////
+
+func GetUserByUserEmail(email string, password string, db *gorm.DB) (*models.User, error) {
+	var user models.User
+	fmt.Println("aaaaaa")
+
+	// parsing stored hashed password of a user by given username
+	StoredHashed, err := GetStoredPassword(db, email)
+	if err != nil {
+		return nil, fmt.Errorf("error getting stored hashed password from db: %s", err.Error())
+	}
+	fmt.Println("bbbbbb")
+
+	// validating the password with user input password
+	errr := models.ValidatePasswords(password, StoredHashed)
+	if errr != nil {
+		return nil, fmt.Errorf("error in validating user: %s", errr.Error())
+	}
+	fmt.Println("cccccc")
+
+	//var db *gorm.DB
+	row := db.Raw("SELECT id, username, email, password FROM users WHERE email = ?", email).Scan(&user)
+	if row.Error != nil {
+		fmt.Println("error is error")
+		return nil, fmt.Errorf("error in retrieving user details: %s", row.Error)
+	}
+	fmt.Println("ddddddd")
+
+	// checking the any error is caused
+	if row.Error != nil {
+		return nil, fmt.Errorf("user not found: %s", row.Error)
+	}
+	fmt.Println("eeeeeee")
+	return &user, nil // returning the user
+}
+
+func GetStoredPassword(db *gorm.DB, email string) (string, error) {
+	var user models.User
+	fmt.Println("email is: ", email)
+	// retrieving user from database using given email
+	result := db.Where("email = ?", email).First(&user)
+	fmt.Println("result is :", result)
+	if result.Error != nil {
+		return "", result.Error // Return error if user not found
+	}
+	return user.Password, nil // Return the stored hashed password
 }

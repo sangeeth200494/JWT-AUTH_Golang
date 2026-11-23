@@ -5,114 +5,256 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/sangeeth200494/JWT-AUTH_Golang/database"
 	"github.com/sangeeth200494/JWT-AUTH_Golang/helpers"
+	"github.com/sangeeth200494/JWT-AUTH_Golang/middleware"
 	"github.com/sangeeth200494/JWT-AUTH_Golang/models"
-	userhandlers "github.com/sangeeth200494/JWT-AUTH_Golang/user-handlers"
 	"gorm.io/gorm"
 )
 
-// sample function
+// Home is a public health / welcome endpoint
 func Home(w http.ResponseWriter, r *http.Request) {
-	// It informs the client (browser, Postman, frontend app, etc.) that the response body will be in JSON format.
 	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusOK, Message: "Welcome Home..!",
-		Details: "You Are Entered Into A Server"})
+	json.NewEncoder(w).Encode(&models.APIResponse{
+		Code:    http.StatusOK,
+		Message: "Welcome Home..!",
+		Details: "You Are Entered Into A Server",
+	})
 }
 
-// function for login the user and user will get a token after successful login
+// LoginHandler authenticates the user, sets a secure HttpOnly cookie, and returns safe user session data
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	// It informs the client (browser, Postman, frontend app, etc.) that the response body will be in JSON format.
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Println("111111")
-	// binding the request body
 	var u models.User
 	err := json.NewDecoder(r.Body).Decode(&u)
 	if err != nil {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "invalid request payload", Details: err.Error()})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: 400, Message: "invalid request payload", Details: err.Error()})
 		return
 	}
-	fmt.Println("22222")
 
-	fmt.Println("Username:", u.Username)
-	fmt.Println("Email:", u.Email)
-	fmt.Println("Password:", u.Password)
-
-	// parsing db connection into a variable
+	// connect to database
 	db, err := database.DBConnection()
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "database connection failed", Details: err.Error()})
 		return
 	}
-	fmt.Println("333333")
 	defer database.DBC(db)
 
-	// calling function to check the existence of a user by email and password
-	user, err := userhandlers.GetUserByUserEmail(u.Email, u.Password, db)
-	fmt.Println("user is : ", user)
+	// check user existence by email and password
+	user, err := helpers.GetUserByUserEmail(u.Email, u.Password, db)
 	if err != nil {
-		// comparing the error with gorm error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "invalid email or password"})
-			return
-		} else {
-			json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error", Details: err.Error()})
+		w.WriteHeader(http.StatusUnauthorized)
+		if errors.Is(err, gorm.ErrRecordNotFound) || strings.Contains(err.Error(), "record not found") || strings.Contains(err.Error(), "hashed password") {
+			json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "invalid email or password", Details: "Invalid email or password"})
 			return
 		}
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "authentication failed", Details: "Invalid credentials"})
+		return
 	}
-	fmt.Println("4444444")
 
 	// generate token
 	token, err := helpers.CreateToken(user.ID, user.Username, user.CreatedAt, user.UpdatedAt, user.LastLogin, user.Status, user.Role)
 	if err != nil {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error", Details: err.Error()})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: 500, Message: "server error generating token", Details: err.Error()})
 		return
 	}
-	fmt.Println("5555555")
-	// returns a new encoder that writes to w.
-	json.NewEncoder(w).Encode(map[string]string{
-		"token": token,
+
+	// Set secure HttpOnly cookie for production session management
+	http.SetCookie(w, &http.Cookie{
+		Name:     "jwt_token",
+		Value:    token,
+		Path:     "/",
+		Expires:  time.Now().Add(24 * time.Hour),
+		MaxAge:   86400,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
+	})
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    200,
+		"message": "login successful",
+		"token":   token, // Provided for external API clients; web UI uses HttpOnly cookie
+		"user": map[string]interface{}{
+			"id":       user.ID,
+			"username": user.Username,
+			"email":    user.Email,
+			"role":     user.Role,
+			"status":   user.Status,
+		},
 	})
 }
 
-func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
-	// It informs the client (browser, Postman, frontend app, etc.) that the response body will be in JSON format.
+// LogoutHandler clears the HttpOnly authentication cookie
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// getting token from header
-	tokenString := r.Header.Get("Authorization")
-	if tokenString == "" {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "Missing authorization header", Details: tokenString})
+	// Clear the jwt_token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "jwt_token",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil,
+	})
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    200,
+		"message": "logged out successfully",
+	})
+}
+
+// SessionHandler returns dynamic, safe session metadata and a masked token representation.
+// CRITICAL: Never exposes the full raw JWT token.
+func SessionHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract token from context (set by AuthMiddleware) or cookie or header
+	rawToken := ""
+	if ctxToken, ok := r.Context().Value(middleware.RawTokenKey).(string); ok && ctxToken != "" {
+		rawToken = ctxToken
+	}
+
+	if rawToken == "" {
+		// Fallback check cookie
+		if cookie, err := r.Cookie("jwt_token"); err == nil && cookie.Value != "" {
+			rawToken = strings.TrimSpace(cookie.Value)
+		}
+	}
+
+	if rawToken == "" {
+		// Fallback check Authorization header
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "" {
+			rawToken = strings.TrimPrefix(authHeader, "Bearer ")
+			rawToken = strings.TrimSpace(rawToken)
+		}
+	}
+
+	if rawToken == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"authenticated":  false,
+			"session_status": "inactive",
+			"token_status":   "Missing",
+			"message":        "No active session found",
+		})
 		return
 	}
-	tokenString = tokenString[len("Bearer "):]
 
-	username, _ := helpers.ExtractUsernameFromToken(tokenString)
-
-	// validating the token
-	errr := helpers.VerifyToken(tokenString)
-	if errr != nil {
-		json.NewEncoder(w).Encode(&models.APIResponse{Code: 401, Message: "Invalid token in verification", Details: errr.Error()})
+	// Verify token validity and claims
+	claims, err := helpers.ExtractClaimsFromToken(rawToken)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"authenticated":  false,
+			"session_status": "expired",
+			"token_status":   "Invalid or Expired",
+			"message":        err.Error(),
+		})
 		return
 	}
 
-	// success response
-	json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusOK, Message: "Welcome to the the protected area", Details: username})
+	// Compute expiration
+	var expTime time.Time
+	sessionStatus := "active"
+	tokenStatus := "Valid"
+
+	if expFloat, ok := claims["exp"].(float64); ok {
+		expTime = time.Unix(int64(expFloat), 0).UTC()
+		if expTime.Before(time.Now().UTC()) {
+			sessionStatus = "expired"
+			tokenStatus = "Expired"
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"authenticated":  false,
+				"session_status": sessionStatus,
+				"token_status":   tokenStatus,
+				"expires_at":     expTime.Format(time.RFC3339),
+			})
+			return
+		}
+	}
+
+	// Build masked token: e.g. eyJhbGciOiJIUzUx...••••••••••••••••
+	maskedToken := helpers.MaskToken(rawToken)
+
+	userID, _ := claims["user_id"].(float64)
+	username, _ := claims["username"].(string)
+	role, _ := claims["role"].(string)
+	status, _ := claims["status"].(string)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"authenticated":  true,
+		"token_type":     "Bearer JWT",
+		"session_status": sessionStatus,
+		"token_status":   tokenStatus,
+		"masked_token":   maskedToken, // Safely masked, never raw!
+		"expires_at":     expTime.Format(time.RFC3339),
+		"user": map[string]interface{}{
+			"id":       uint64(userID),
+			"username": username,
+			"role":     role,
+			"status":   status,
+		},
+	})
+}
+
+// ProtectedHandler handles access to the protected area
+func ProtectedHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Get username from context (set by AuthMiddleware)
+	username := ""
+	if ctxUser, ok := r.Context().Value(middleware.UsernameKey).(string); ok && ctxUser != "" {
+		username = ctxUser
+	}
+
+	if username == "" {
+		// Fallback to extract from token
+		rawToken := ""
+		if ctxToken, ok := r.Context().Value(middleware.RawTokenKey).(string); ok {
+			rawToken = ctxToken
+		}
+		if rawToken != "" {
+			if u, err := helpers.ExtractUsernameFromToken(rawToken); err == nil {
+				username, _ = u.(string)
+			}
+		}
+	}
+
+	if username == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(&models.APIResponse{Code: http.StatusUnauthorized, Message: "unauthorized: invalid session", Details: ""})
+		return
+	}
+
+	json.NewEncoder(w).Encode(&models.APIResponse{
+		Code:    http.StatusOK,
+		Message: "Welcome to the protected area",
+		Details: username,
+	})
 }
 
 func VerifyUser(UserName string, db *gorm.DB) (*models.User, error) {
 	var user models.User
-	// querying to get a user name from db
 	res := db.Raw("SELECT username FROM users WHERE username = ?", UserName).Scan(&user)
 	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("username doesn't exist")
 	}
-
-	// checking any error caused
 	if res.Error != nil {
 		return nil, fmt.Errorf("error in checking user existence: %s", res.Error)
 	}
-	return &user, nil // returning the specified user and nil error
+	return &user, nil
 }
