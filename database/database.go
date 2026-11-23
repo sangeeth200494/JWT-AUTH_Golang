@@ -11,13 +11,9 @@ import (
 )
 
 func DBConnection() (db *gorm.DB, err error) {
-	// er := godotenv.Load()
-	// if er != nil {
-	// 	log.Fatal("Error loading .env file:", er.Error())
-	// }
 	er := godotenv.Load(".env")
 	if er != nil {
-		log.Fatal(er.Error())
+		log.Println("Note: .env file not loaded or not found:", er.Error())
 	}
 	fmt.Println("1111")
 	// Load from environment variables
@@ -32,7 +28,8 @@ func DBConnection() (db *gorm.DB, err error) {
 	// Connect to database
 	db, errr := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if errr != nil {
-		log.Fatal("Failed to connect:", errr.Error())
+		log.Println("Failed to connect to database:", errr.Error())
+		return nil, errr
 	}
 	fmt.Println("33333")
 
@@ -45,12 +42,15 @@ func DBConnection() (db *gorm.DB, err error) {
     failed_login_attempts INTEGER DEFAULT 0,lock_status BOOLEAN DEFAULT FALSE,deleted_at TIMESTAMP NULL);
 	`)
 	if res.Error != nil {
-		fmt.Printf("error in creating unexciting users table in database: %v", res.Error)
+		fmt.Printf("error in creating users table in database: %v\n", res.Error)
 	}
 	return db, nil
 }
 
 func DBC(db *gorm.DB) {
+	if db == nil {
+		return
+	}
 	// Get the raw SQL DB connection
 	sqlDB, err := db.DB()
 	if err != nil {

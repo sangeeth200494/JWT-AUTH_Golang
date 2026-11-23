@@ -1,2 +1,28 @@
+# Environment and secret files
 .env
-.vscode
+.env.*
+!.env.example
+
+# IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build output and temporary directories
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.out
+.gopath/
+.gocache/
+.tmp/
+
+# Test coverage artifacts
+coverage.out
+coverage.html
+coverage.txt

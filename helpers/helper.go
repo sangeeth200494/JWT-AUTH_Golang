@@ -115,6 +115,47 @@ func ExtractUsernameFromToken(tokenString string) (interface{}, error) {
 	return username, nil // returning the username and nil error
 }
 
+// MaskToken returns a masked representation of the JWT token.
+// Expected Format: eyJhbGciOiJIUzUx...••••••••••••••••
+// Never exposes the complete token, sensitive payload, or signature.
+func MaskToken(tokenString string) string {
+	token := strings.TrimPrefix(tokenString, "Bearer ")
+	token = strings.TrimSpace(token)
+	if len(token) == 0 {
+		return "••••••••••••••••"
+	}
+	if len(token) <= 16 {
+		return "••••••••••••••••"
+	}
+	prefix := token[:16]
+	return prefix + "...••••••••••••••••"
+}
+
+// ExtractClaimsFromToken parses and extracts claims from a valid token.
+func ExtractClaimsFromToken(tokenString string) (jwt.MapClaims, error) {
+	tokenStr := strings.TrimPrefix(tokenString, "Bearer ")
+	tokenStr = strings.TrimSpace(tokenStr)
+
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token: %v", err)
+	}
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid claims")
+	}
+	return claims, nil
+}
+
 /////////////////////////////--------Get User helper function--------/////////////////////////////
 
 func GetUserByUserEmail(email string, password string, db *gorm.DB) (*models.User, error) {
@@ -136,17 +177,17 @@ func GetUserByUserEmail(email string, password string, db *gorm.DB) (*models.Use
 	fmt.Println("cccccc")
 
 	//var db *gorm.DB
-	// row := db.Raw("SELECT id, username, email, password FROM users WHERE email = ?", email).Scan(&user)
-	// if row.Error != nil {
-	// 	fmt.Println("error is error")
-	// 	return nil, fmt.Errorf("error in retrieving user details: %s", row.Error)
-	// }
-	// fmt.Println("ddddddd")
+	row := db.Raw("SELECT id, username, email, password FROM users WHERE email = ?", email).Scan(&user)
+	if row.Error != nil {
+		fmt.Println("error is error")
+		return nil, fmt.Errorf("error in retrieving user details: %s", row.Error)
+	}
+	fmt.Println("ddddddd")
 
-	// // checking the any error is caused
-	// if row.Error != nil {
-	// 	return nil, fmt.Errorf("user not found: %s", row.Error)
-	// }
+	// checking the any error is caused
+	if row.Error != nil {
+		return nil, fmt.Errorf("user not found: %s", row.Error)
+	}
 	fmt.Println("eeeeeee")
 	return &user, nil // returning the user
 }

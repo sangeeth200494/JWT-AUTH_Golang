@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JWT Authentication Portal</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <nav class="navbar">
+    <a href="/" class="nav-brand">
+      🔐 JWT Auth Server
+      <span class="badge">Golang + GORM</span>
+    </a>
+    <div class="nav-links">
+      <button id="nav-login" class="nav-btn" onclick="showView('login')">Sign In</button>
+      <button id="nav-register" class="nav-btn" onclick="showView('register')">Register</button>
+      <button id="nav-dashboard" class="nav-btn" onclick="showView('dashboard')">Dashboard</button>
+      <button id="nav-logout" class="nav-btn hidden" onclick="handleLogout()" style="color: #f87171;">Sign Out</button>
+    </div>
+  </nav>
+
+  <!-- Main View Container -->
+  <main class="main-container">
+
+    <!-- 1. SIGN IN VIEW -->
+    <section id="login-view" class="view-section">
+      <div class="auth-card">
+        <div class="auth-header">
+          <h2>Welcome Back</h2>
+          <p>Sign in with your email and password. Your session is protected with secure HttpOnly cookies.</p>
+        </div>
+
+        <div id="login-alert" class="hidden"></div>
+
+        <form id="form-login" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label for="login-email">Email Address</label>
+            <input type="email" id="login-email" class="form-control" placeholder="user@example.com" required value="user@example.com">
+          </div>
+
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" class="form-control" placeholder="Enter password" required value="Password123!">
+          </div>
+
+          <button type="submit" id="btn-login-submit" class="btn-submit">Sign In</button>
+          
+          <button type="button" class="btn-secondary" onclick="handleDemoToken()">
+            ⚡ Instant Demo Login (Generate Test Session)
+          </button>
+        </form>
+
+        <div class="auth-footer">
+          Don't have an account? <a href="javascript:void(0)" onclick="showView('register')">Register here</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. REGISTRATION VIEW -->
+    <section id="register-view" class="view-section hidden">
+      <div class="auth-card">
+        <div class="auth-header">
+          <h2>Create Account</h2>
+          <p>Register a new user in PostgreSQL with bcrypt-hashed password protection.</p>
+        </div>
+
+        <div id="register-alert" class="hidden"></div>
+
+        <form id="form-register" onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label for="reg-username">Username *</label>
+            <input type="text" id="reg-username" class="form-control" placeholder="johndoe" required>
+          </div>
+
+          <div class="form-group">
+            <label for="reg-email">Email Address *</label>
+            <input type="email" id="reg-email" class="form-control" placeholder="john@example.com" required>
+          </div>
+
+          <div class="form-group">
+            <label for="reg-password">Password *</label>
+            <input type="password" id="reg-password" class="form-control" placeholder="Secure password" required>
+          </div>
+
+          <div class="form-group">
+            <label for="reg-fullname">Full Name</label>
+            <input type="text" id="reg-fullname" class="form-control" placeholder="John Doe">
+          </div>
+
+          <div class="form-group">
+            <label for="reg-phone">Phone Number</label>
+            <input type="text" id="reg-phone" class="form-control" placeholder="+1 234 567 8900">
+          </div>
+
+          <button type="submit" id="btn-register-submit" class="btn-submit">Create Account</button>
+        </form>
+
+        <div class="auth-footer">
+          Already registered? <a href="javascript:void(0)" onclick="showView('login')">Sign in</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. PROTECTED DASHBOARD VIEW -->
+    <section id="dashboard-view" class="view-section hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <div>
+          <h2>Protected Dashboard 🛡️</h2>
+          <p style="color: var(--text-secondary);">Welcome, <strong id="dash-welcome-user" style="color: #60a5fa;">User</strong>! Authenticated session is active.</p>
+        </div>
+        <button class="nav-btn primary" onclick="handleLogout()">Sign Out</button>
+      </div>
+
+      <div class="dashboard-grid">
+        <!-- 1. User Identity Card -->
+        <div class="dashboard-card">
+          <h3>👤 Verified Identity</h3>
+          <div class="claim-row">
+            <span class="claim-label">User ID:</span>
+            <span class="claim-value" id="dash-user-id">-</span>
+          </div>
+          <div class="claim-row">
+            <span class="claim-label">Username:</span>
+            <span class="claim-value" id="dash-username">-</span>
+          </div>
+          <div class="claim-row">
+            <span class="claim-label">Role:</span>
+            <span class="claim-value" id="dash-role">-</span>
+          </div>
+          <div class="claim-row">
+            <span class="claim-label">Account Status:</span>
+            <span class="claim-value" id="dash-status">-</span>
+          </div>
+        </div>
+
+        <!-- 2. Dedicated Authentication Details Card -->
+        <div class="dashboard-card auth-details-card">
+          <div class="auth-details-header">
+            <h3>AUTHENTICATION DETAILS</h3>
+            <span class="auth-mode-pill">🔒 HttpOnly Protection</span>
+          </div>
+
+          <div class="auth-details-content">
+            <div class="claim-row">
+              <span class="claim-label">Authentication Status:</span>
+              <span class="claim-value status-badge active" id="auth-status-badge">Active</span>
+            </div>
+
+            <div class="claim-row">
+              <span class="claim-label">Token Type:</span>
+              <span class="claim-value" id="auth-token-type">Bearer JWT</span>
+            </div>
+
+            <div class="claim-row" style="flex-direction: column; align-items: flex-start; gap: 0.35rem; padding-top: 0.65rem;">
+              <span class="claim-label">Access Token:</span>
+              <div class="masked-token-display">
+                <code class="masked-code" id="auth-masked-token">eyJhbGciOiJIUzUx...••••••••••••••••</code>
+                <span class="masked-shield">🛡️ Masked</span>
+              </div>
+            </div>
+
+            <div class="claim-row">
+              <span class="claim-label">Token Status:</span>
+              <span class="claim-value status-badge valid" id="auth-token-status">Valid</span>
+            </div>
+
+            <div class="claim-row">
+              <span class="claim-label">Expiration:</span>
+              <span class="claim-value" id="auth-expiration">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Live Protected Route Verification Card -->
+      <div class="dashboard-card" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3>🚀 Live Route Verification (GET /protected)</h3>
+          <button class="nav-btn primary" onclick="testProtectedEndpoint()">Verify Protected Route</button>
+        </div>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">
+          The browser sends the secure authentication session cookie to the Go middleware to verify access:
+        </p>
+        <pre id="protected-endpoint-result" class="code-response">Ready to test...</pre>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    JWT Authentication System &bull; Golang, Gorilla Mux, GORM PostgreSQL &bull; Production Security &bull; Port 4000
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
